@@ -24,10 +24,29 @@ router.post('/quote', async (req, res) => {
 // POST /jobs — calculate a price AND save a real Job row
 router.post('/', async (req, res) => {
   try {
-    const { serviceType, duty_level, pickup, dropoff, customerName, customerPhone } = req.body;
+    const {
+      serviceType,
+      duty_level,
+      pickup,
+      dropoff,
+      customerName,
+      customerPhone,
+      customerPhoneAlt,
+      with_vehicle,
+      staying_with_vehicle,
+      latitude,
+      longitude,
+      location_accuracy,
+    } = req.body;
 
     if (!serviceType || !pickup || !dropoff) {
       return res.status(400).json({ error: 'serviceType, pickup, and dropoff are required' });
+    }
+
+    const hasLatitude = latitude !== undefined && latitude !== null;
+    const hasLongitude = longitude !== undefined && longitude !== null;
+    if (hasLatitude !== hasLongitude) {
+      return res.status(400).json({ error: 'latitude and longitude must be provided together' });
     }
 
     const dutyLevel = duty_level || 'regular';
@@ -36,8 +55,9 @@ router.post('/', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO jobs (service_type, duty_level, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                         customer_name, customer_phone, distance_miles, price_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                         customer_name, customer_phone, customer_phone_alt, distance_miles, price_cents,
+                         with_vehicle, staying_with_vehicle, latitude, longitude, location_accuracy_meters)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         serviceType,
@@ -48,8 +68,14 @@ router.post('/', async (req, res) => {
         dropoff.lng,
         customerName || null,
         customerPhone || null,
+        customerPhoneAlt || null,
         quote.distanceMiles,
         quote.priceCents,
+        with_vehicle ?? null,
+        staying_with_vehicle ?? null,
+        hasLatitude ? latitude : null,
+        hasLongitude ? longitude : null,
+        location_accuracy ?? null,
       ]
     );
 
