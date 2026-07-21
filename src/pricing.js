@@ -18,21 +18,31 @@ function toRad(deg) {
   return (deg * Math.PI) / 180;
 }
 
+// Additional flat-rate surcharges for roadside assistance subtypes.
+const SUBTYPE_SURCHARGE_CENTS = {
+  lockout: 1500, // $15 extra -- lockouts typically take longer
+  tire_change: 500, // $5 extra
+};
+
 /**
  * Calculate a quote for a towing/roadside job.
  * Returns { distanceMiles, priceCents, priceFormatted }.
  */
-function calculateQuote({ serviceType, pickup, dropoff }) {
+function calculateQuote({ serviceType, serviceSubtype, pickup, dropoff }) {
   const baseCents = serviceType === 'tow' ? 7500 : 5000; // $75 tow, $50 roadside
   const perMileCents = 350; // $3.50 per mile
+  const surchargeCents =
+    serviceType === 'roadside_assistance' && serviceSubtype
+      ? SUBTYPE_SURCHARGE_CENTS[serviceSubtype] || 0
+      : 0;
 
   const miles = distanceMiles(pickup, dropoff);
-  const priceCents = Math.round(baseCents + perMileCents * miles);
+  const priceCents = Math.round(baseCents + surchargeCents + perMileCents * miles);
 
   return {
     distanceMiles: Math.round(miles * 100) / 100,
     priceCents,
-    priceFormatted: `$${(priceCents / 100).toFixed(2)}`,
+    priceFormatted: '$' + (priceCents / 100).toFixed(2),
   };
 }
 
