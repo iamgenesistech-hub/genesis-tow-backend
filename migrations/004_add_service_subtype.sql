@@ -1,0 +1,2 @@
+ALTER TABLE jobs
+  ADD COLUMN IF NOT EXISTS service_subtype TEXT;
