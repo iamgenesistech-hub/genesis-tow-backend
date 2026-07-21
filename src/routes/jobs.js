@@ -7,13 +7,19 @@ const router = Router();
 // POST /jobs/quote — calculate a price, nothing saved
 router.post('/quote', async (req, res) => {
   try {
-    const { serviceType, duty_level, pickup, dropoff } = req.body;
+    const { serviceType, duty_level, pickup, dropoff, add_insurance } = req.body;
 
     if (!serviceType || !pickup || !dropoff) {
       return res.status(400).json({ error: 'serviceType, pickup, and dropoff are required' });
     }
 
-    const quote = calculateQuote({ serviceType, duty_level: duty_level || 'regular', pickup, dropoff });
+    const quote = calculateQuote({
+      serviceType,
+      duty_level: duty_level || 'regular',
+      pickup,
+      dropoff,
+      add_insurance,
+    });
     res.json(quote);
   } catch (err) {
     console.error('POST /jobs/quote error:', err);
@@ -24,7 +30,7 @@ router.post('/quote', async (req, res) => {
 // POST /jobs — calculate a price AND save a real Job row
 router.post('/', async (req, res) => {
   try {
-    const { serviceType, duty_level, pickup, dropoff, customerName, customerPhone } = req.body;
+    const { serviceType, duty_level, pickup, dropoff, customerName, customerPhone, add_insurance } = req.body;
 
     if (!serviceType || !pickup || !dropoff) {
       return res.status(400).json({ error: 'serviceType, pickup, and dropoff are required' });
@@ -32,12 +38,19 @@ router.post('/', async (req, res) => {
 
     const dutyLevel = duty_level || 'regular';
 
-    const quote = calculateQuote({ serviceType, duty_level: dutyLevel, pickup, dropoff });
+    const quote = calculateQuote({
+      serviceType,
+      duty_level: dutyLevel,
+      pickup,
+      dropoff,
+      add_insurance,
+    });
 
     const result = await pool.query(
       `INSERT INTO jobs (service_type, duty_level, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                         customer_name, customer_phone, distance_miles, price_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                         customer_name, customer_phone, distance_miles, price_cents,
+                         add_insurance, insurance_fee_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         serviceType,
@@ -50,6 +63,8 @@ router.post('/', async (req, res) => {
         customerPhone || null,
         quote.distanceMiles,
         quote.priceCents,
+        !!add_insurance,
+        quote.insuranceFeeCents,
       ]
     );
 

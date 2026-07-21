@@ -31,7 +31,7 @@ genesis-tow-backend/
 |---|---|---|
 | GET | `/health` | Liveness check |
 | POST | `/jobs/quote` | Calculate a price, nothing saved |
-| POST | `/jobs` | Calculate a price AND save a real Job row |
+| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee) |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
 
