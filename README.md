@@ -35,6 +35,24 @@ genesis-tow-backend/
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
 
+### POST /jobs — additional customer & location fields
+
+Alongside `serviceType`, `pickup`, `dropoff`, `customerName`, and
+`customerPhone`, the endpoint also accepts:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `customerPhoneAlt` | string | no | Optional secondary phone number |
+| `with_vehicle` | boolean | no | Whether the customer is currently with the vehicle |
+| `staying_with_vehicle` | boolean | no | Whether the customer will stay with the vehicle |
+| `latitude` | number | no | GPS latitude of the customer's pickup location |
+| `longitude` | number | no | GPS longitude of the customer's pickup location |
+| `location_accuracy` | number | no | Accuracy of the GPS reading, in meters |
+
+`latitude` and `longitude` must be provided together — sending only one of
+them returns a `400` error. These fields power Lyft/Uber-style live driver
+tracking and improve dispatch accuracy.
+
 ## Running it in Google Cloud Shell (local dev loop)
 
 Cloud Shell gives you Node and git already, but not a running Postgres —
@@ -98,7 +116,7 @@ Postgres** instance rather than installing Postgres inside Cloud Shell
 
    curl -X POST http://localhost:3000/jobs \
      -H "Content-Type: application/json" \
-     -d '{"serviceType":"tow","pickup":{"lat":33.7501,"lng":-84.3885},"dropoff":{"lat":33.7756,"lng":-84.2963},"customerName":"Jane Doe","customerPhone":"+14045551234"}'
+     -d '{"serviceType":"tow","pickup":{"lat":33.7501,"lng":-84.3885},"dropoff":{"lat":33.7756,"lng":-84.2963},"customerName":"Jane Doe","customerPhone":"+14045551234","customerPhoneAlt":"+14045555678","with_vehicle":true,"staying_with_vehicle":true,"latitude":33.7501,"longitude":-84.3885,"location_accuracy":15}'
 
    curl http://localhost:3000/jobs
    ```
