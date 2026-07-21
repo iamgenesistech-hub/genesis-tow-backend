@@ -25,11 +25,14 @@ const DUTY_LEVEL_MULTIPLIERS = {
   heavy_duty: 1.5,
 };
 
+// Flat fee charged when a customer opts in to the insurance add-on.
+const INSURANCE_FEE_CENTS = 1200; // $12 flat fee
+
 /**
  * Calculate a quote for a towing/roadside job.
- * Returns { distanceMiles, priceCents, priceFormatted }.
+ * Returns { distanceMiles, priceCents, priceFormatted, insuranceFeeCents }.
  */
-function calculateQuote({ serviceType, duty_level, pickup, dropoff }) {
+function calculateQuote({ serviceType, duty_level, pickup, dropoff, add_insurance }) {
   const baseCentsByService = {
     tow: 7500, // $75 tow
     roadside_assistance: 5000, // $50 roadside assistance
@@ -41,12 +44,14 @@ function calculateQuote({ serviceType, duty_level, pickup, dropoff }) {
   const dutyMultiplier = DUTY_LEVEL_MULTIPLIERS[duty_level] ?? DUTY_LEVEL_MULTIPLIERS.regular;
 
   const miles = distanceMiles(pickup, dropoff);
-  const priceCents = Math.round((baseCents + perMileCents * miles) * dutyMultiplier);
+  const insuranceFeeCents = add_insurance ? INSURANCE_FEE_CENTS : 0;
+  const priceCents = Math.round((baseCents + perMileCents * miles) * dutyMultiplier) + insuranceFeeCents;
 
   return {
     distanceMiles: Math.round(miles * 100) / 100,
     priceCents,
     priceFormatted: `${(priceCents / 100).toFixed(2)}`,
+    insuranceFeeCents,
   };
 }
 
