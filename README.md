@@ -12,10 +12,14 @@ genesis-tow-backend/
 │   ├── index.js         ← starts the server, defines /health
 │   ├── db.js            ← shared Postgres connection pool
 │   ├── pricing.js        ← quote math (pure logic, no web/db stuff)
+│   ├── drivers.js         ← mock driver pool + random assignment
+│   ├── sms.js             ← Twilio SMS integration
 │   └── routes/
-│       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id
+│       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id, PATCH /jobs/:id
 ├── migrations/
-│   └── 001_create_jobs.sql
+│   ├── 001_create_jobs.sql
+│   ├── 003_add_duty_level.sql
+│   └── 006_add_rating_and_tip.sql
 ├── scripts/
 │   └── migrate.js         ← runs migrations against DATABASE_URL
 ├── railway.json            ← explicit Railway build/start config
@@ -31,9 +35,10 @@ genesis-tow-backend/
 |---|---|---|
 | GET | `/health` | Liveness check |
 | POST | `/jobs/quote` | Calculate a price, nothing saved |
-| POST | `/jobs` | Calculate a price AND save a real Job row |
+| POST | `/jobs` | Calculate a price AND save a real Job row, assigns a driver |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
+| PATCH | `/jobs/:id` | Record a rating/tip, mark job completed, and send a completion SMS |
 
 ## Running it in Google Cloud Shell (local dev loop)
 
