@@ -11,11 +11,13 @@ genesis-tow-backend/
 ├── src/
 │   ├── index.js         ← starts the server, defines /health
 │   ├── db.js            ← shared Postgres connection pool
+│   ├── geocoder.js       ← OpenCage geocoder instance (address → lat/lng)
 │   ├── pricing.js        ← quote math (pure logic, no web/db stuff)
 │   └── routes/
 │       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id
 ├── migrations/
-│   └── 001_create_jobs.sql
+│   ├── 001_create_jobs.sql
+│   └── 002_add_address_columns.sql
 ├── scripts/
 │   └── migrate.js         ← runs migrations against DATABASE_URL
 ├── railway.json            ← explicit Railway build/start config
@@ -98,7 +100,7 @@ Postgres** instance rather than installing Postgres inside Cloud Shell
 
    curl -X POST http://localhost:3000/jobs \
      -H "Content-Type: application/json" \
-     -d '{"serviceType":"tow","pickup":{"lat":33.7501,"lng":-84.3885},"dropoff":{"lat":33.7756,"lng":-84.2963},"customerName":"Jane Doe","customerPhone":"+14045551234"}'
+     -d '{"serviceType":"tow","pickup_address":"123 Main St, Atlanta, GA","dropoff_address":"456 Oak Ave, Atlanta, GA","customerName":"Jane Doe","customerPhone":"+14045551234"}'
 
    curl http://localhost:3000/jobs
    ```
@@ -132,6 +134,10 @@ production database without you ever typing the connection string.
   port, and hands off `/jobs` requests to `routes/jobs.js`.
 - **`src/db.js`** — the one shared Postgres connection pool. Everything
   that touches the database imports from here.
+- **`src/geocoder.js`** — creates the OpenCage geocoder instance (needs
+  `OPENCAGE_API_KEY` in `.env`). Converts a street address string into
+  `{ lat, lng }` so the rest of the app never has to deal with raw text
+  addresses.
 - **`src/pricing.js`** — the business logic. Given a service type and
   locations, works out a price. Zero knowledge of HTTP or the database —
   just math you could unit test on its own.
