@@ -12,8 +12,9 @@ genesis-tow-backend/
 │   ├── index.js         ← starts the server, defines /health
 │   ├── db.js            ← shared Postgres connection pool
 │   ├── pricing.js        ← quote math (pure logic, no web/db stuff)
+│   ├── stripe.js         ← Stripe helper (test mode payment intents)
 │   └── routes/
-│       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id
+│       └── jobs.js       ← POST /jobs/checkout, POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id
 ├── migrations/
 │   └── 001_create_jobs.sql
 ├── scripts/
@@ -30,10 +31,39 @@ genesis-tow-backend/
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Liveness check |
+| POST | `/jobs/checkout` | Create a Stripe PaymentIntent (test mode) and return a `clientSecret` for the frontend to confirm payment |
 | POST | `/jobs/quote` | Calculate a price, nothing saved |
-| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee) |
+| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee, and optional `stripe_payment_id` once payment has been confirmed) |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
+
+### Stripe payments (test mode)
+
+Customers pay via Stripe **before** a job is created. The flow is:
+
+1. Frontend calls `POST /jobs/checkout` with the amount to charge and the
+   customer's email/name. The backend creates a Stripe `PaymentIntent`
+   and returns its `clientSecret`.
+2. Frontend uses `clientSecret` with Stripe.js/Stripe Elements to confirm
+   the payment (using a test card, e.g. `4242 4242 4242 4242`, since
+   we're running on `sk_test_*` / `pk_test_*` keys).
+3. Once the payment succeeds, the frontend calls `POST /jobs` and
+   includes the resulting `stripe_payment_id` (the PaymentIntent ID).
+   The backend re-checks the payment status with Stripe and only creates
+   the job if the payment did not fail.
+
+```
+curl -X POST http://localhost:3000/jobs/checkout \
+  -H "Content-Type: application/json" \
+  -d '{"amount_cents": 8500, "customer_email": "jane@example.com", "customer_name": "Jane Doe"}'
+
+# => { "clientSecret": "pi_xxx_secret_xxx" }
+```
+
+Set `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` in `.env` (see
+`.env.example`) using your Stripe **test mode** keys from
+https://dashboard.stripe.com/test/apikeys — these start with `sk_test_`
+and `pk_test_` respectively and never touch real money.
 
 ## Running it in Google Cloud Shell (local dev loop)
 
@@ -135,8 +165,11 @@ production database without you ever typing the connection string.
 - **`src/pricing.js`** — the business logic. Given a service type and
   locations, works out a price. Zero knowledge of HTTP or the database —
   just math you could unit test on its own.
+- **`src/stripe.js`** — thin wrapper around the Stripe SDK. Exposes
+  `createPaymentIntent(amountCents, email, name)` used by
+  `POST /jobs/checkout`.
 - **`src/routes/jobs.js`** — translates HTTP requests into calls to
-  `pricing.js` and `db.js`, and sends back JSON.
+  `pricing.js`, `stripe.js`, and `db.js`, and sends back JSON.
 - **`migrations/001_create_jobs.sql`** — the one SQL statement that
   defines the `jobs` table shape.
 - **`scripts/migrate.js`** — runs every `.sql` file in `migrations/`, in

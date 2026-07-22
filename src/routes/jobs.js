@@ -1,8 +1,33 @@
 const { Router } = require('express');
 const pool = require('../db');
 const { calculateQuote, calculateCombinedQuote } = require('../pricing');
+const { createPaymentIntent, stripe } = require('../stripe');
 
 const router = Router();
+
+// POST /jobs/checkout — create a Stripe PaymentIntent for a booking.
+// Customer pays via Stripe (test mode) BEFORE the job is created.
+router.post('/checkout', async (req, res) => {
+  try {
+    const { amount_cents, customer_email, customer_name } = req.body;
+
+    const amountCents = Number(amount_cents);
+    if (!amountCents || Number.isNaN(amountCents) || amountCents <= 0) {
+      return res.status(400).json({ error: 'amount_cents must be a positive number' });
+    }
+
+    if (!customer_email) {
+      return res.status(400).json({ error: 'customer_email is required' });
+    }
+
+    const { clientSecret } = await createPaymentIntent(amountCents, customer_email, customer_name);
+
+    res.json({ clientSecret });
+  } catch (err) {
+    console.error('POST /jobs/checkout error:', err);
+    res.status(500).json({ error: 'Failed to create payment intent' });
+  }
+});
 
 // POST /jobs/quote — calculate a price, nothing saved
 router.post('/quote', async (req, res) => {
@@ -51,6 +76,7 @@ router.post('/', async (req, res) => {
       customerName, customerPhone, add_insurance,
       winch_difficulty, driverLocation, combined,
       key_location, key_location_custom,
+      stripe_payment_id,
     } = req.body;
 
     if (!serviceType || !pickup || !dropoff) {
@@ -58,6 +84,32 @@ router.post('/', async (req, res) => {
     }
 
     const dutyLevel = duty_level || 'regular';
+
+    // Payment must succeed before job creation
+    let paymentStatus = 'pending';
+    let amountPaidCents = 0;
+
+    if (stripe_payment_id) {
+      let paymentIntent;
+      try {
+        paymentIntent = await stripe.paymentIntents.retrieve(stripe_payment_id);
+      } catch (err) {
+        console.error('Failed to retrieve Stripe payment intent:', err);
+        return res.status(400).json({ error: 'Invalid stripe_payment_id' });
+      }
+
+      if (!paymentIntent) {
+        return res.status(400).json({ error: 'Invalid stripe_payment_id' });
+      }
+
+      paymentStatus = paymentIntent.status === 'succeeded' ? 'succeeded' : 'failed';
+      amountPaidCents = paymentIntent.amount_received || paymentIntent.amount || 0;
+    }
+
+    // Payment must succeed before job creation
+    if (paymentStatus === 'failed') {
+      return res.status(402).json({ error: 'Payment failed, job was not created' });
+    }
 
     // Combined winch-out + tow → create two linked job rows
     if (combined || serviceType === 'winch_and_tow') {
@@ -75,8 +127,9 @@ router.post('/', async (req, res) => {
         `INSERT INTO jobs (service_type, duty_level, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
                            customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                            price_cents, add_insurance, insurance_fee_cents, winch_difficulty,
-                           is_combined, key_location, key_location_custom)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                           is_combined, key_location, key_location_custom,
+                           stripe_payment_id, payment_status, amount_paid_cents)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
          RETURNING *`,
         [
           'winch_out', dutyLevel,
@@ -86,6 +139,7 @@ router.post('/', async (req, res) => {
           combinedQuote.winchOut.priceCents, false, 0,
           winch_difficulty || 'moderate', true,
           key_location || null, key_location_custom || null,
+          stripe_payment_id || null, paymentStatus, amountPaidCents,
         ]
       );
 
@@ -94,8 +148,9 @@ router.post('/', async (req, res) => {
         `INSERT INTO jobs (service_type, duty_level, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
                            customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                            price_cents, add_insurance, insurance_fee_cents,
-                           is_combined, parent_job_id, key_location, key_location_custom)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                           is_combined, parent_job_id, key_location, key_location_custom,
+                           stripe_payment_id, payment_status, amount_paid_cents)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
          RETURNING *`,
         [
           'tow', dutyLevel,
@@ -105,6 +160,7 @@ router.post('/', async (req, res) => {
           combinedQuote.tow.priceCents, !!add_insurance, combinedQuote.insuranceFeeCents,
           true, winchResult.rows[0].id,
           key_location || null, key_location_custom || null,
+          stripe_payment_id || null, paymentStatus, amountPaidCents,
         ]
       );
 
@@ -133,8 +189,9 @@ router.post('/', async (req, res) => {
       `INSERT INTO jobs (service_type, duty_level, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
                          customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                          price_cents, add_insurance, insurance_fee_cents, winch_difficulty,
-                         key_location, key_location_custom)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                         key_location, key_location_custom,
+                         stripe_payment_id, payment_status, amount_paid_cents)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING *`,
       [
         serviceType, dutyLevel,
@@ -144,6 +201,7 @@ router.post('/', async (req, res) => {
         quote.priceCents, !!add_insurance, quote.insuranceFeeCents,
         winch_difficulty || null,
         key_location || null, key_location_custom || null,
+        stripe_payment_id || null, paymentStatus, amountPaidCents,
       ]
     );
 
