@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const jobsRouter = require('./routes/jobs');
+const driversRouter = require('./routes/drivers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/jobs', jobsRouter);
+app.use('/drivers', driversRouter);
 
 app.listen(PORT, () => {
   console.log(`Genesis Tow backend listening on port ${PORT}`);
