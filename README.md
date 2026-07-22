@@ -31,9 +31,22 @@ genesis-tow-backend/
 |---|---|---|
 | GET | `/health` | Liveness check |
 | POST | `/jobs/quote` | Calculate a price, nothing saved |
-| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee) |
+| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee, plus `with_vehicle`, `key_location`, and `key_location_custom` for driver key access — see below) |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
+
+### `POST /jobs` key location fields
+
+When the customer will **not** be staying with the vehicle (`with_vehicle: false`),
+the request must also include where the keys are hidden so the driver can get in:
+
+- `key_location` *(required when `with_vehicle` is `false`)* — one of:
+  `with_customer`, `under_mat`, `under_bumper`, `mailbox`, `with_neighbor`, `other`
+- `key_location_custom` *(required when `key_location` is `"other"`)* — free-text
+  description of where the keys are, e.g. `"in the mailbox at the end of the driveway"`
+
+Both fields are stored as-is and are only expected to be populated when
+`with_vehicle` is `false`.
 
 ## Running it in Google Cloud Shell (local dev loop)
 
