@@ -12,8 +12,9 @@ genesis-tow-backend/
 │   ├── index.js         ← starts the server, defines /health
 │   ├── db.js            ← shared Postgres connection pool
 │   ├── pricing.js        ← quote math (pure logic, no web/db stuff)
+│   ├── sms.js            ← SMS sending helper (cancellation confirmations, etc.)
 │   └── routes/
-│       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id
+│       └── jobs.js       ← POST /jobs/quote, POST /jobs, GET /jobs, GET /jobs/:id, DELETE /jobs/:id
 ├── migrations/
 │   └── 001_create_jobs.sql
 ├── scripts/
@@ -34,6 +35,32 @@ genesis-tow-backend/
 | POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee) |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
+| DELETE | `/jobs/:id` | Cancel a booking (only if status is `pending` or `assigned`). Requires a `cancellation_reason` in the body |
+
+### Cancelling a booking
+
+`DELETE /jobs/:id` lets a customer cancel a booking any time before a driver
+arrives — as long as the job's status is still `pending` or `assigned`. Jobs
+that are `in_progress`, `completed`, or already `cancelled` can't be
+cancelled through this endpoint.
+
+Cancelling automatically:
+- Sets `status` to `cancelled` and records `cancelled_at`
+- Charges a flat **$15 (1500 cent) cancellation fee**, stored in
+  `cancellation_fee_cents`
+- Sends the customer an SMS confirming the cancellation and fee
+
+Request body:
+```json
+{ "cancellation_reason": "Changed my mind" }
+```
+
+Example:
+```
+curl -X DELETE https://backend/jobs/123 \
+  -H "Content-Type: application/json" \
+  -d '{"cancellation_reason":"Changed my mind"}'
+```
 
 ## Running it in Google Cloud Shell (local dev loop)
 
@@ -137,8 +164,13 @@ production database without you ever typing the connection string.
   just math you could unit test on its own.
 - **`src/routes/jobs.js`** — translates HTTP requests into calls to
   `pricing.js` and `db.js`, and sends back JSON.
+- **`src/sms.js`** — thin wrapper around sending an SMS (e.g. the
+  cancellation confirmation text). Swap in a real provider here later.
 - **`migrations/001_create_jobs.sql`** — the one SQL statement that
   defines the `jobs` table shape.
+- **`migrations/009_add_cancellation_fields.sql`** — adds `status`,
+  `cancelled_at`, `cancellation_reason`, and `cancellation_fee_cents` to
+  `jobs` to support booking cancellations.
 - **`scripts/migrate.js`** — runs every `.sql` file in `migrations/`, in
   order, against whatever `DATABASE_URL` currently points to (local or
   production — same script, different target).

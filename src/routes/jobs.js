@@ -1,6 +1,9 @@
 const { Router } = require('express');
 const pool = require('../db');
 const { calculateQuote, calculateCombinedQuote } = require('../pricing');
+const { sendSms } = require('../sms');
+
+const CANCELLATION_FEE_CENTS = 1500; // flat $15 cancellation fee
 
 const router = Router();
 
@@ -210,6 +213,51 @@ router.patch('/:id', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('PATCH /jobs/:id error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /jobs/:id — customer cancels a booking
+// Only allowed while the job is still 'pending' or 'assigned'. Automatically
+// applies a flat $15 cancellation fee and texts the customer a confirmation.
+router.delete('/:id', async (req, res) => {
+  try {
+    const { cancellation_reason } = req.body;
+
+    if (!cancellation_reason) {
+      return res.status(400).json({ error: 'cancellation_reason is required' });
+    }
+
+    const jobResult = await pool.query('SELECT * FROM jobs WHERE id = $1', [req.params.id]);
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = jobResult.rows[0];
+    if (!['pending', 'assigned'].includes(job.status)) {
+      return res.status(409).json({
+        error: `Cannot cancel a job with status '${job.status}'. Only 'pending' or 'assigned' jobs can be cancelled.`,
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE jobs
+       SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = $1, cancellation_fee_cents = $2
+       WHERE id = $3
+       RETURNING *`,
+      [cancellation_reason, CANCELLATION_FEE_CENTS, req.params.id]
+    );
+
+    const cancelledJob = result.rows[0];
+
+    await sendSms(
+      cancelledJob.customer_phone,
+      'Your tow service has been cancelled. A $15 cancellation fee has been applied to your account.'
+    );
+
+    res.json(cancelledJob);
+  } catch (err) {
+    console.error('DELETE /jobs/:id error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
