@@ -77,6 +77,7 @@ router.post('/', async (req, res) => {
       winch_difficulty, driverLocation, combined,
       key_location, key_location_custom,
       stripe_payment_id,
+      vehicle_year, vehicle_make, vehicle_model, vehicle_color, vehicle_drive_type,
     } = req.body;
 
     if (!serviceType || !pickup || !dropoff) {
@@ -128,8 +129,9 @@ router.post('/', async (req, res) => {
                            customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                            price_cents, add_insurance, insurance_fee_cents, winch_difficulty,
                            is_combined, key_location, key_location_custom,
-                           stripe_payment_id, payment_status, amount_paid_cents)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                           stripe_payment_id, payment_status, amount_paid_cents,
+                           vehicle_year, vehicle_make, vehicle_model, vehicle_color, vehicle_drive_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
          RETURNING *`,
         [
           'winch_out', dutyLevel,
@@ -140,6 +142,7 @@ router.post('/', async (req, res) => {
           winch_difficulty || 'moderate', true,
           key_location || null, key_location_custom || null,
           stripe_payment_id || null, paymentStatus, amountPaidCents,
+          vehicle_year || null, vehicle_make || null, vehicle_model || null, vehicle_color || null, vehicle_drive_type || null,
         ]
       );
 
@@ -149,8 +152,9 @@ router.post('/', async (req, res) => {
                            customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                            price_cents, add_insurance, insurance_fee_cents,
                            is_combined, parent_job_id, key_location, key_location_custom,
-                           stripe_payment_id, payment_status, amount_paid_cents)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                           stripe_payment_id, payment_status, amount_paid_cents,
+                           vehicle_year, vehicle_make, vehicle_model, vehicle_color, vehicle_drive_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
          RETURNING *`,
         [
           'tow', dutyLevel,
@@ -161,6 +165,7 @@ router.post('/', async (req, res) => {
           true, winchResult.rows[0].id,
           key_location || null, key_location_custom || null,
           stripe_payment_id || null, paymentStatus, amountPaidCents,
+          vehicle_year || null, vehicle_make || null, vehicle_model || null, vehicle_color || null, vehicle_drive_type || null,
         ]
       );
 
@@ -190,8 +195,9 @@ router.post('/', async (req, res) => {
                          customer_name, customer_phone, distance_miles, en_route_miles, en_route_cents,
                          price_cents, add_insurance, insurance_fee_cents, winch_difficulty,
                          key_location, key_location_custom,
-                         stripe_payment_id, payment_status, amount_paid_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                         stripe_payment_id, payment_status, amount_paid_cents,
+                         vehicle_year, vehicle_make, vehicle_model, vehicle_color, vehicle_drive_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
        RETURNING *`,
       [
         serviceType, dutyLevel,
@@ -202,6 +208,7 @@ router.post('/', async (req, res) => {
         winch_difficulty || null,
         key_location || null, key_location_custom || null,
         stripe_payment_id || null, paymentStatus, amountPaidCents,
+        vehicle_year || null, vehicle_make || null, vehicle_model || null, vehicle_color || null, vehicle_drive_type || null,
       ]
     );
 
