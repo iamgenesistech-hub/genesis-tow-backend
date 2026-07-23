@@ -33,7 +33,7 @@ genesis-tow-backend/
 | GET | `/health` | Liveness check |
 | POST | `/jobs/checkout` | Create a Stripe PaymentIntent (test mode) and return a `clientSecret` for the frontend to confirm payment |
 | POST | `/jobs/quote` | Calculate a price, nothing saved |
-| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee, and optional `stripe_payment_id` once payment has been confirmed) |
+| POST | `/jobs` | Calculate a price AND save a real Job row (accepts optional `add_insurance` boolean for a flat $12 insurance fee, optional `stripe_payment_id` once payment has been confirmed, and optional vehicle details — `vehicle_year`, `vehicle_make`, `vehicle_model`, `vehicle_color`, `vehicle_drive_type`) |
 | GET | `/jobs` | List the 50 most recent jobs |
 | GET | `/jobs/:id` | Fetch one job |
 
@@ -132,6 +132,35 @@ Postgres** instance rather than installing Postgres inside Cloud Shell
 
    curl http://localhost:3000/jobs
    ```
+
+### Vehicle details (optional)
+
+`POST /jobs` accepts optional vehicle information so drivers can identify
+the vehicle at pickup. All fields are optional since the customer may not
+know their vehicle's details:
+
+- `vehicle_year` — 4-digit year, e.g. `2019`
+- `vehicle_make` — e.g. `"Toyota"`, `"Ford"`
+- `vehicle_model` — e.g. `"Camry"`, `"F-150"`
+- `vehicle_color` — e.g. `"Red"`, `"Silver"`
+- `vehicle_drive_type` — one of `"2WD"`, `"4WD"`, `"AWD"`, `"RWD"`, `"Unknown"`
+
+```
+curl -X POST http://localhost:3000/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+        "serviceType":"tow",
+        "pickup":{"lat":33.7501,"lng":-84.3885},
+        "dropoff":{"lat":33.7756,"lng":-84.2963},
+        "customerName":"Jane Doe",
+        "customerPhone":"+14045551234",
+        "vehicle_year":2019,
+        "vehicle_make":"Toyota",
+        "vehicle_model":"Camry",
+        "vehicle_color":"Silver",
+        "vehicle_drive_type":"AWD"
+      }'
+```
 
 ## Deploying to Railway
 
